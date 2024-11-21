@@ -54,6 +54,7 @@ def get_enclosure(w, h, center=(0,0)):
     )
     return enclosure
 
+beta_prev = 0
 
 robot = Robot(
     state=np.array([2, 2, 0]),
@@ -63,7 +64,7 @@ robot = Robot(
     wheels={
         "hl": Wheel(+1.0 / 2.0 * np.pi, 0.23, 0, 0, steerable=False, motor=False),
         "hr": Wheel(-1.0 / 2.0 * np.pi, 0.23, np.pi, 0, steerable=False, motor=False),
-        "v": Wheel(0, 0.46, 0, 0, steerable=True, motor=True)
+        "v": Wheel(0, 0.46, beta_prev, 0, steerable=True, motor=True)
     },
     lasers=np.linspace(np.pi / 2, -np.pi / 2, num=8, endpoint=True),
     enclosure=get_enclosure(1.0, 0.6, center=(-0.2, 0))
@@ -79,6 +80,7 @@ robot = Robot(
 def state_update(api: RoboSimPyWidget, world, inputs):
     # The time step provided by the api.
     # Either a fixed value or the computation time of the last iteration in seconds.
+    global beta_prev
     dt = api.dt
 
     # Setting speed for the Vorderrad
@@ -97,11 +99,13 @@ def state_update(api: RoboSimPyWidget, world, inputs):
     # angle
     beta = (beta - 0.02 if "a" in inputs else beta + 0.02 if "d" in inputs else beta)
     # Note: for some reason the directions in the gui are different
+    delta_beta = np.arccos(np.cos(beta - beta_prev))
+    beta_prev = beta
     robot.wheels["v"].beta = beta
 
     # Error propagation of odometry.
     robot.C_p = update_c_p(
-        robot.C_p, robot.theta, v, dt, robot.wheels["v"].l, beta, 0.001, 0.001
+        robot.C_p, robot.theta, v, dt, robot.wheels["v"].l, beta, 0.001, 0.001, delta_beta
     )
     api.draw_error_ellipse(robot.C_p, robot.pos)
 
@@ -158,16 +162,17 @@ def pose_jacobian(theta, v, dt, l, beta):
     )
 
 # Motion covariance, see siehe Siegwart/Nourbakhsh, p. 188
-def motion_covariance(v, dt, k_s, k_beta):
+def motion_covariance(v, dt, k_s, k_beta, delta_beta):
     s = v * dt
     # Note: Annahme dass der Fehler von beta nur mit der zurückgelegten Strecke korreliert
-    return np.array([[k_s * abs(s), 0.0], [0.0, k_beta * abs(s)]])
+    # (beta_t1 - beta_t0)
+    return np.array([[k_s * abs(s), 0.0], [0.0, k_beta * abs(delta_beta)]])
 
 # Update of odometry error estimation
-def update_c_p(C_p, theta, v, dt, l, beta, k_s, k_beta):
+def update_c_p(C_p, theta, v, dt, l, beta, k_s, k_beta, delta_beta):
     f_p = pose_jacobian(theta, v, dt, l, beta)
     f_delta = motion_jacobian(theta, v, dt, l, beta)
-    c_delta = motion_covariance(v, dt, k_s, k_beta)
+    c_delta = motion_covariance(v, dt, k_s, k_beta, delta_beta)
     return f_p @ C_p @ f_p.T + f_delta @ c_delta @ f_delta.T
 
 

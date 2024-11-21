@@ -24,7 +24,7 @@ with pkg_resources.open_text(worlds, "simple_world.json") as file:
 # Creating a robot with two wheels, a laser scanner with 8 beams,
 # a simple, square enclosure and a starting pose.
 robot = Robot(
-    state=np.array([2, 1, 0]),
+    state=np.array([2, 3, 0]),
     initial_C_p=np.array([[0., 0, 0],
                           [0, 0., 0],
                           [0, 0, 0.]]),
@@ -50,7 +50,7 @@ MAX_ERROR = 0.1
 TARGET_DISTANCE_TO_OBSTACLE = 0.7
 SPEED_MULT_ON_TURN = 5
 SPEED = 0.03
-FOLLOW_RIGHT = True
+FOLLOW_RIGHT = False
 
 
 def wall_following_control(
