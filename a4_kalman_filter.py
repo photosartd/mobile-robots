@@ -65,16 +65,19 @@ class Beacons:
 class KalmanFilter:
     def __init__(
             self,
+            beacons: Beacons,
             state: np.ndarray,
             covariance: np.ndarray | None = None,
             sigma_k: float = 0.1,
-            sigma_p: float = 0.1
+            sigma_p: float = 0.1,
+            g: float = 3.0
     ):
         """
         Parameters
         ----------
         state [x,y,theta] numpy array of size [3,]
         """
+        self.beacons = beacons
         self.state = state
         if covariance is None:
             self.covariance = np.zeros((state.shape[0], state.shape[0]))
@@ -82,25 +85,55 @@ class KalmanFilter:
             self.covariance = covariance
         self.sigma_k = sigma_k
         self.sigma_p = sigma_p
+        self.g = g
+
+    def choose_beacon(self, beacon_pose: np.ndarray, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, threshold: float = 9.0):
+        z_real = self.z(beacon_pose, v=True)
+        matches = []
+        best_match_dist = np.inf
+        for current_beacon in self.beacons.positions:
+            z_cap = self.z(current_beacon, v=False)
+            Hk = KalmanFilter.Hk(current_beacon, x_k_k_1[:2])
+            Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk, Vk=self.Vk)
+            nu = z_real - z_cap # Innovation
+            dist = KalmanFilter.mahalanobis_distance(nu, Sk)
+            if dist < threshold:
+                if dist < best_match_dist:
+                    best_match_dist = dist
+                    matches.append(current_beacon)
+        if len(matches) == 0:
+            return False, None
+        elif len(matches) == 1:
+            return True, matches[0]
+        else:
+            return False, None
 
     def update(self, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, beacon_pose: np.ndarray) -> None:
+        # Establish a match
+        match_found, beacon = self.choose_beacon(
+            beacon_pose=beacon_pose,
+            x_k_k_1=x_k_k_1,
+            C_k_k_1=C_k_k_1,
+            threshold=self.g
+        )
+        if not match_found:
+            print("No matches found. Using predict step")
+            self.state = x_k_k_1
+            self.covariance = C_k_k_1
+            return # No update
+        else:
+            #print("Match found")
+            beacon_pose = beacon # Update based on the match
         z = self.z(beacon_pose, v=True)
         z_cap = self.z(beacon_pose, v=False)
 
-        Hk = KalmanFilter.Hk(beacon_pose, self.pos)
+        Hk = KalmanFilter.Hk(beacon_pose, x_k_k_1[:2])
         Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk, Vk=self.Vk)
         K = KalmanFilter.K(Hk=Hk, C_k_k_1=C_k_k_1, Sk=Sk)
         x_k_k = x_k_k_1 + (K @ (z - z_cap)).reshape((3,))
-        C_k_k = (np.identity(n=C_k_k_1.shape[0]) - K @ Hk) @ C_k_k_1
+        C_k_k = C_k_k_1 - K @ Sk @ K.T # (np.identity(n=C_k_k_1.shape[0]) - K @ Hk) @ C_k_k_1
         self.state = x_k_k
         self.covariance = C_k_k
-        print("z:", z.shape)
-        print("Hk:", Hk.shape)
-        print("Sk:", Sk.shape)
-        print("x_k_k_1:", x_k_k_1.shape)
-        print("K:", K.shape)
-        print("x_k_k:", x_k_k.shape)
-        print("C_k_k:", C_k_k.shape)
 
     def draw(self, api: RoboSimPyWidget):
         api.draw_particles(self.state.reshape((1, 3)), pointsize=15, color=(0.0, 1.0, 0.0, 1.0))
@@ -221,8 +254,10 @@ class KalmanFilter:
         x_k, y_k, theta_k = robot_pos
         return np.arctan2(y_Li - y_k, x_Li - x_k) - theta_k - v_pk
 
+    @staticmethod
+    def mahalanobis_distance(nu: np.ndarray, Sk: np.ndarray) -> float:
+        return (nu.T @ np.linalg.inv(Sk) @ nu).item()
 
-kf = KalmanFilter(state=robot.state.copy())
 beacons = Beacons(
     positions=np.array(
         [
@@ -232,6 +267,7 @@ beacons = Beacons(
         ]
     )
 )
+kf = KalmanFilter(beacons=beacons, state=robot.state.copy(), g=9.0)
 kl, kr = 0.001, 0.001
 
 
@@ -255,7 +291,7 @@ def state_update(api: RoboSimPyWidget, world, inputs):
     api.draw_lasers(robot.pos, hitpoints)
     # print(laser_distances)
     # print(hitpoints[:2])
-    print(robot.theta)
+    #print(robot.theta)
 
     vr = (0.01 if "e" in inputs else -0.01 if "d" in inputs else 0.0) * dt
     vl = (0.01 if "q" in inputs else -0.01 if "a" in inputs else 0.0) * dt
