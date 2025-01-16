@@ -59,7 +59,8 @@ class Beacons:
         api.draw_particles(self.positions, pointsize=self.pointsize, color=self.color)
 
     def sample(self) -> np.ndarray:
-        return self.positions[np.random.choice(len(self.positions), size=1)].copy().reshape((2,))
+        a = np.random.choice(len(self.positions), size=1)
+        return self.positions[a].copy().reshape((2,))
 
 
 class KalmanFilter:
@@ -90,25 +91,21 @@ class KalmanFilter:
     def choose_beacon(self, beacon_pose: np.ndarray, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, threshold: float = 9.0):
         z_real = self.z(beacon_pose, v=True)
         matches = []
-        best_match_dist = np.inf
-        z_best = None
         for current_beacon in self.beacons.positions:
             z_cap = self.z(current_beacon, v=False)
-            Hk = KalmanFilter.Hk(current_beacon, x_k_k_1[:2])
-            Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk, Vk=self.Vk)
+            Hk = KalmanFilter.Hk(current_beacon, x_k_k_1[:2])[1,:]
+            Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk[1:2,1:2], Vk=self.Vk[1:2,1:2])
             nu = z_real - z_cap # Innovation
-            dist = KalmanFilter.mahalanobis_distance(nu, Sk)
+            #dist = KalmanFilter.mahalanobis_distance(nu, Sk)
+            dist = nu[1]**2 * 1./Sk.item()
             if dist < threshold:
-                if dist < best_match_dist:
-                    best_match_dist = dist
-                    z_best = z_real
-                    matches.append(current_beacon)
+                matches.append(current_beacon)
         if len(matches) == 0:
-            return False, None, z_best
+            return False, None, z_real
         elif len(matches) == 1:
-            return True, matches[0], z_best
+            return True, matches[0], z_real
         else:
-            return False, None, z_best
+            return False, None, z_real
 
     def update(self, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, beacon_pose: np.ndarray) -> None:
         # Establish a match
@@ -128,12 +125,12 @@ class KalmanFilter:
             beacon_pose = beacon # Update based on the match
         z = z_real#self.z(beacon_pose, v=True)
         z_cap = self.z(beacon_pose, v=False)
-        print(f"Z mit Rauschen: {z[1]}")
-        print(f"Z: {z_cap[1]}")
 
         Hk = KalmanFilter.Hk(beacon_pose, x_k_k_1[:2])
         Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk, Vk=self.Vk)
+        
         K = KalmanFilter.K(Hk=Hk, C_k_k_1=C_k_k_1, Sk=Sk)
+        
         x_k_k = x_k_k_1 + (K @ (z - z_cap)).reshape((3,))
         C_k_k = C_k_k_1 - K @ Sk @ K.T # (np.identity(n=C_k_k_1.shape[0]) - K @ Hk) @ C_k_k_1
         self.state = x_k_k
@@ -144,18 +141,18 @@ class KalmanFilter:
 
     @property
     def pos(self) -> np.ndarray:
-        return self.state[:2]
+        return self.state.copy()[:2]
 
     @property
     def theta(self) -> float:
-        return self.state[2]
+        return self.state.copy()[2]
 
     @property
     def Nk(self) -> np.ndarray:
         return np.array(
             [
-                [self.sigma_k ** 2, 0],
-                [0, self.sigma_p ** 2]
+                [self.sigma_k ** 2, 0.],
+                [0., self.sigma_p ** 2]
             ]
         )
 
@@ -164,8 +161,8 @@ class KalmanFilter:
         """See V_k = \frac{\partial h}{\partial v}"""
         return np.array(
             [
-                [1, 0],
-                [0, -1]
+                [1., 0.],
+                [0., -1.]
             ]
         )
 
