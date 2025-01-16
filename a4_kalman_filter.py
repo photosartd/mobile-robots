@@ -68,8 +68,8 @@ class KalmanFilter:
             beacons: Beacons,
             state: np.ndarray,
             covariance: np.ndarray | None = None,
-            sigma_k: float = 0.1,
-            sigma_p: float = 0.1,
+            sigma_k: float = 0.01,
+            sigma_p: float = 0.01,
             g: float = 3.0
     ):
         """
@@ -91,6 +91,7 @@ class KalmanFilter:
         z_real = self.z(beacon_pose, v=True)
         matches = []
         best_match_dist = np.inf
+        z_best = None
         for current_beacon in self.beacons.positions:
             z_cap = self.z(current_beacon, v=False)
             Hk = KalmanFilter.Hk(current_beacon, x_k_k_1[:2])
@@ -100,17 +101,18 @@ class KalmanFilter:
             if dist < threshold:
                 if dist < best_match_dist:
                     best_match_dist = dist
+                    z_best = z_real
                     matches.append(current_beacon)
         if len(matches) == 0:
-            return False, None
+            return False, None, z_best
         elif len(matches) == 1:
-            return True, matches[0]
+            return True, matches[0], z_best
         else:
-            return False, None
+            return False, None, z_best
 
     def update(self, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, beacon_pose: np.ndarray) -> None:
         # Establish a match
-        match_found, beacon = self.choose_beacon(
+        match_found, beacon, z_real = self.choose_beacon(
             beacon_pose=beacon_pose,
             x_k_k_1=x_k_k_1,
             C_k_k_1=C_k_k_1,
@@ -122,10 +124,12 @@ class KalmanFilter:
             self.covariance = C_k_k_1
             return # No update
         else:
-            #print("Match found")
+            print("Match found")
             beacon_pose = beacon # Update based on the match
-        z = self.z(beacon_pose, v=True)
+        z = z_real#self.z(beacon_pose, v=True)
         z_cap = self.z(beacon_pose, v=False)
+        print(f"Z mit Rauschen: {z[1]}")
+        print(f"Z: {z_cap[1]}")
 
         Hk = KalmanFilter.Hk(beacon_pose, x_k_k_1[:2])
         Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk, Vk=self.Vk)
