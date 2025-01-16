@@ -88,8 +88,7 @@ class KalmanFilter:
         self.sigma_p = sigma_p
         self.g = g
 
-    def choose_beacon(self, beacon_pose: np.ndarray, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, threshold: float = 9.0):
-        z_real = self.z(beacon_pose, v=True)
+    def choose_beacon(self, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, z_real: np.ndarray, threshold: float = 9.0):
         matches = []
         for current_beacon in self.beacons.positions:
             z_cap = self.z(current_beacon, v=False)
@@ -101,18 +100,18 @@ class KalmanFilter:
             if dist < threshold:
                 matches.append(current_beacon)
         if len(matches) == 0:
-            return False, None, z_real
+            return False, None
         elif len(matches) == 1:
-            return True, matches[0], z_real
+            return True, matches[0]
         else:
-            return False, None, z_real
+            return False, None
 
-    def update(self, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, beacon_pose: np.ndarray) -> None:
+    def update(self, x_k_k_1: np.ndarray, C_k_k_1: np.ndarray, z_real: np.ndarray) -> None:
         # Establish a match
-        match_found, beacon, z_real = self.choose_beacon(
-            beacon_pose=beacon_pose,
+        match_found, beacon = self.choose_beacon(
             x_k_k_1=x_k_k_1,
             C_k_k_1=C_k_k_1,
+            z_real=z_real,
             threshold=self.g
         )
         if not match_found:
@@ -130,6 +129,8 @@ class KalmanFilter:
         Sk = KalmanFilter.Sk(Hk=Hk, C_k_k_1=C_k_k_1, Nk=self.Nk, Vk=self.Vk)
         
         K = KalmanFilter.K(Hk=Hk, C_k_k_1=C_k_k_1, Sk=Sk)
+        print("K", K)
+        print("Diff:", z - z_cap)
         
         x_k_k = x_k_k_1 + (K @ (z - z_cap)).reshape((3,))
         C_k_k = C_k_k_1 - K @ Sk @ K.T # (np.identity(n=C_k_k_1.shape[0]) - K @ Hk) @ C_k_k_1
@@ -166,7 +167,7 @@ class KalmanFilter:
             ]
         )
 
-    def z(self, beacon_pos: np.ndarray, v: bool = False):
+    def z(self, beacon_pos: np.ndarray, v: bool = False, TRUE_STATE: np.ndarray | None = None):
         """
         Parameters
         ----------
@@ -177,6 +178,10 @@ class KalmanFilter:
         -------
         z = [2x1] array with \beta and \alpha
         """
+        if TRUE_STATE is None:
+            x, y, theta = self.state
+        else:
+            x, y, theta = TRUE_STATE
         if v:
             v_k = np.random.normal(loc=0, scale=self.sigma_k, size=1).item()
             v_p = np.random.normal(loc=0, scale=self.sigma_p, size=1).item()
@@ -184,8 +189,8 @@ class KalmanFilter:
             v_k = 0.0
             v_p = 0.0
         return np.array(
-            [[KalmanFilter.h_k(self.theta, v_k)],
-             [KalmanFilter.alpha_k(beacon_pos, self.state, v_p)]]
+            [[KalmanFilter.h_k(theta, v_k)],
+             [KalmanFilter.alpha_k(beacon_pos, np.array([x, y, theta]), v_p)]]
         )
 
     @staticmethod
@@ -319,10 +324,15 @@ def state_update(api: RoboSimPyWidget, world, inputs):
     x_k_k_1 = update_pose(
         kf.pos[0], kf.pos[1], kf.theta, vl, vr, dt, robot.wheels["vr"].l
     )
+    z_real = kf.z(
+        beacon_pos=beacons.sample(),
+        v=True,
+        TRUE_STATE=robot.state
+    )
     kf.update(
         x_k_k_1=x_k_k_1,
         C_k_k_1=C_k_k_1,
-        beacon_pose=beacons.sample()
+        z_real=z_real
     )
     kf.draw(api)
     api.draw_error_ellipse(kf.covariance, kf.pos)
