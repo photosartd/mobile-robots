@@ -1,0 +1,5 @@
+if(EXISTS "/repositories/robosimpy/robosimcpp/build/robosimcpp_tests[1]_tests.cmake")
+  include("/repositories/robosimpy/robosimcpp/build/robosimcpp_tests[1]_tests.cmake")
+else()
+  add_test(robosimcpp_tests_NOT_BUILT robosimcpp_tests_NOT_BUILT)
+endif()

@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC -flto -shared  -o pylocalise.cpython-311-aarch64-linux-gnu.so CMakeFiles/pylocalise.dir/src/bindings.cpp.o  -Wl,-rpath,/repositories/robosimpy/robosimcpp/build: liblocalise.so 
