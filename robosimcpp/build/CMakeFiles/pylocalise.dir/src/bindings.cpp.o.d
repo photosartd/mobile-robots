@@ -566,6 +566,23 @@ CMakeFiles/pylocalise.dir/src/bindings.cpp.o: \
  /repositories/robosimpy/robosimcpp/thirdparty/eigen/Eigen/src/SparseCore/SparseFuzzy.h \
  /repositories/robosimpy/robosimcpp/thirdparty/eigen/Eigen/src/SparseCore/SparseSolverBase.h \
  /repositories/robosimpy/robosimcpp/thirdparty/pybind11/include/pybind11/functional.h \
+ /repositories/robosimpy/robosimcpp/thirdparty/pybind11/include/pybind11/stl.h \
+ /usr/include/c++/13/deque /usr/include/c++/13/bits/stl_deque.h \
+ /usr/include/c++/13/bits/deque.tcc /usr/include/c++/13/list \
+ /usr/include/c++/13/bits/stl_list.h /usr/include/c++/13/bits/list.tcc \
+ /usr/include/c++/13/set /usr/include/c++/13/bits/stl_set.h \
+ /usr/include/c++/13/bits/stl_multiset.h /usr/include/c++/13/valarray \
+ /usr/include/c++/13/bits/valarray_array.h \
+ /usr/include/c++/13/bits/valarray_array.tcc \
+ /usr/include/c++/13/bits/valarray_before.h \
+ /usr/include/c++/13/bits/slice_array.h \
+ /usr/include/c++/13/bits/valarray_after.h \
+ /usr/include/c++/13/bits/gslice.h \
+ /usr/include/c++/13/bits/gslice_array.h \
+ /usr/include/c++/13/bits/mask_array.h \
+ /usr/include/c++/13/bits/indirect_array.h /usr/include/c++/13/variant \
+ /repositories/robosimpy/robosimcpp/thirdparty/pybind11/include/pybind11/stl_bind.h \
+ /repositories/robosimpy/robosimcpp/thirdparty/pybind11/include/pybind11/operators.h \
  /usr/include/c++/13/iostream \
  /repositories/robosimpy/robosimcpp/include/localise.h \
  /repositories/robosimpy/robosimcpp/include/landmark.h \

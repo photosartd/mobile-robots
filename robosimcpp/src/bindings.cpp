@@ -1,6 +1,8 @@
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>  // Required for Python <-> std::vector conversion
+#include <pybind11/stl_bind.h>  // (Optional) Helps with shared_ptr handling
 
 #include <exception>
 #include <iostream>
